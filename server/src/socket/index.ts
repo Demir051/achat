@@ -308,6 +308,14 @@ export function initSocket(httpServer: HttpServer) {
       if (prev && prev !== channelId) leaveVoice(socket, prev);
 
       const voiceRoom = getRoom(channelId);
+
+      // Aynı kullanıcının eski/kopuk socket kayıtlarını temizle
+      for (const [sid, p] of voiceRoom.entries()) {
+        if (p.userId === user.id && sid !== socket.id) {
+          voiceRoom.delete(sid);
+        }
+      }
+
       const existing = Array.from(voiceRoom.values()).filter((p) => p.userId !== user.id);
       socket.emit("voice:participants", { channelId, participants: existing });
 
@@ -371,14 +379,20 @@ export function initSocket(httpServer: HttpServer) {
 
   function leaveVoice(socket: Socket, channelId: string) {
     const room = voiceRooms.get(channelId);
+    let removed = false;
     if (room?.has(socket.id)) {
       room.delete(socket.id);
+      removed = true;
       if (room.size === 0) voiceRooms.delete(channelId);
     }
     socket.leave(`voice:${channelId}`);
-    (socket.data as { voiceChannel?: string }).voiceChannel = undefined;
-    io.to(`voice:${channelId}`).emit("voice:user-left", { channelId, socketId: socket.id });
-    scheduleRoster(channelId);
+    if ((socket.data as { voiceChannel?: string }).voiceChannel === channelId) {
+      (socket.data as { voiceChannel?: string }).voiceChannel = undefined;
+    }
+    if (removed) {
+      io.to(`voice:${channelId}`).emit("voice:user-left", { channelId, socketId: socket.id });
+      scheduleRoster(channelId);
+    }
   }
 
   function scheduleRoster(channelId: string) {

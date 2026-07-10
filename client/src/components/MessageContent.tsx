@@ -36,6 +36,39 @@ interface MessageContentProps {
   roles?: Role[];
 }
 
+export function messageMentionsUser(
+  content: string,
+  user: { id: string; username: string } | null | undefined,
+  userRoles: Role[] = [],
+  roles: Role[] = [],
+  authorId?: string | null
+): boolean {
+  if (!user) return false;
+
+  const parts = content.split(/(@[\w]+|<@&[\w]+>)/g);
+  let personalMention = false;
+  let everyoneMention = false;
+  let roleMention = false;
+
+  for (const part of parts) {
+    if (part.startsWith("@") && !part.startsWith("<@&")) {
+      const name = part.slice(1).toLowerCase();
+      if (name === "everyone") everyoneMention = true;
+      else if (name === user.username.toLowerCase()) personalMention = true;
+    }
+    if (part.startsWith("<@&")) {
+      const roleId = part.slice(3, -1);
+      const role = roles.find((r) => r.id === roleId);
+      if (role?.name.toLowerCase() === "everyone") everyoneMention = true;
+      else if (userRoles.some((r) => r.id === roleId)) roleMention = true;
+    }
+  }
+
+  if (everyoneMention || roleMention) return true;
+  if (personalMention && authorId !== user.id) return true;
+  return false;
+}
+
 export function MessageContent({ content, members = [], roles = [] }: MessageContentProps) {
   const parts = content.split(/(@[\w]+|<@&[\w]+>)/g);
 

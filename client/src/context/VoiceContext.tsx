@@ -9,6 +9,8 @@ import {
 import { getSocket } from "../lib/socket";
 import { playSound } from "../lib/sounds";
 import { useWebRTC } from "../hooks/useWebRTC";
+import { useAuth } from "../store/auth";
+import { useToast } from "../store/toast";
 import { useVoice } from "../store/voice";
 import type { VoiceParticipant } from "../types";
 
@@ -30,6 +32,8 @@ export function useVoiceSession() {
 }
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
+  const user = useAuth((s) => s.user);
+  const toast = useToast((s) => s.push);
   const connectedChannelId = useVoice((s) => s.connectedChannelId);
   const participants = useVoice((s) => s.participants);
   const {
@@ -38,6 +42,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     addParticipant,
     removeParticipant,
     updateParticipant,
+    setRoster,
+    removeUserFromRoster,
     setMuted: setStoreMuted,
     setScreenSharing: setStoreScreenSharing,
     reset,
@@ -46,10 +52,33 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const joiningRef = useRef(false);
   const socketHandlersBound = useRef(false);
   const prevScreenSharing = useRef(false);
+  const webrtcRef = useRef<ReturnType<typeof useWebRTC> | null>(null);
 
   const webrtc = useWebRTC(connectedChannelId, participants);
+  webrtcRef.current = webrtc;
 
-  // Socket dinleyicileri — bir kez bağlan
+  const rejoinVoice = useCallback(async (channelId: string) => {
+    const socket = getSocket();
+    if (!socket?.connected || joiningRef.current) return false;
+
+    joiningRef.current = true;
+    try {
+      webrtcRef.current?.stopAll();
+      setParticipants([]);
+      const stream = await webrtcRef.current?.startLocalAudio();
+      if (!stream) {
+        toast("Mikrofon açılamadı", "error");
+        reset();
+        return false;
+      }
+      socket.emit("voice:join", channelId);
+      return true;
+    } finally {
+      joiningRef.current = false;
+    }
+  }, [reset, setParticipants, toast]);
+
+  // Socket dinleyicileri
   useEffect(() => {
     const socket = getSocket();
     if (!socket || socketHandlersBound.current) return;
@@ -108,7 +137,24 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       channelId: string;
       participants: VoiceParticipant[];
     }) => {
-      useVoice.getState().setRoster(channelId, list);
+      setRoster(channelId, list);
+    };
+
+    const onVoiceError = ({ error }: { error: string }) => {
+      toast(error, "error");
+      webrtcRef.current?.stopAll();
+      reset();
+    };
+
+    const onDisconnect = () => {
+      webrtcRef.current?.stopAll();
+      setParticipants([]);
+    };
+
+    const onReconnect = () => {
+      const { connectedChannelId: chId } = useVoice.getState();
+      if (!chId) return;
+      void rejoinVoice(chId);
     };
 
     socket.on("voice:participants", onParticipants);
@@ -116,6 +162,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     socket.on("voice:user-left", onLeft);
     socket.on("voice:state", onState);
     socket.on("voice:roster", onRoster);
+    socket.on("voice:error", onVoiceError);
+    socket.on("disconnect", onDisconnect);
+    socket.io.on("reconnect", onReconnect);
 
     return () => {
       socket.off("voice:participants", onParticipants);
@@ -123,9 +172,21 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       socket.off("voice:user-left", onLeft);
       socket.off("voice:state", onState);
       socket.off("voice:roster", onRoster);
+      socket.off("voice:error", onVoiceError);
+      socket.off("disconnect", onDisconnect);
+      socket.io.off("reconnect", onReconnect);
       socketHandlersBound.current = false;
     };
-  }, [addParticipant, removeParticipant, setParticipants, updateParticipant]);
+  }, [
+    addParticipant,
+    rejoinVoice,
+    removeParticipant,
+    reset,
+    setParticipants,
+    setRoster,
+    toast,
+    updateParticipant,
+  ]);
 
   const joinVoice = useCallback(
     async (channelId: string, channelName: string) => {
@@ -133,26 +194,41 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       if (!socket || joiningRef.current) return;
 
       const current = useVoice.getState().connectedChannelId;
-      if (current === channelId) return;
+      const hasLiveAudio = !!webrtcRef.current?.localStream;
+
+      if (current === channelId && hasLiveAudio) return;
 
       joiningRef.current = true;
       try {
-        if (current) {
+        if (current === channelId && !hasLiveAudio) {
+          webrtcRef.current?.stopAll();
+          setParticipants([]);
+        }
+
+        if (current && current !== channelId) {
           socket.emit("voice:leave", current);
-          webrtc.stopAll();
+          if (user?.id) removeUserFromRoster(current, user.id);
+          webrtcRef.current?.stopAll();
           reset();
         }
 
         setConnected(channelId, channelName);
         setParticipants([]);
-        await webrtc.startLocalAudio();
+
+        const stream = await webrtcRef.current?.startLocalAudio();
+        if (!stream) {
+          toast("Mikrofon izni gerekli", "error");
+          reset();
+          return;
+        }
+
         socket.emit("voice:join", channelId);
         playSound("voiceJoin");
       } finally {
         joiningRef.current = false;
       }
     },
-    [reset, setConnected, setParticipants, webrtc]
+    [removeUserFromRoster, reset, setConnected, setParticipants, toast, user?.id]
   );
 
   const leaveVoice = useCallback(() => {
@@ -161,28 +237,28 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     if (!channelId) return;
 
     socket?.emit("voice:leave", channelId);
-    webrtc.stopAll();
+    if (user?.id) removeUserFromRoster(channelId, user.id);
+    webrtcRef.current?.stopAll();
     reset();
     playSound("voiceLeave");
-  }, [reset, webrtc]);
+  }, [removeUserFromRoster, reset, user?.id]);
 
   const toggleMute = useCallback(() => {
-    const nowMuted = webrtc.toggleMute();
+    const nowMuted = webrtcRef.current?.toggleMute();
     if (typeof nowMuted === "boolean") {
       setStoreMuted(nowMuted);
       playSound(nowMuted ? "mute" : "unmute");
     }
-  }, [setStoreMuted, webrtc]);
+  }, [setStoreMuted]);
 
   const toggleScreenShare = useCallback(async () => {
-    const nowSharing = await webrtc.toggleScreenShare();
+    const nowSharing = await webrtcRef.current?.toggleScreenShare();
     if (typeof nowSharing === "boolean") {
       setStoreScreenSharing(nowSharing);
       if (nowSharing) playSound("screenShareStart");
     }
-  }, [setStoreScreenSharing, webrtc]);
+  }, [setStoreScreenSharing]);
 
-  // WebRTC muted/screen state senkronu
   useEffect(() => {
     setStoreMuted(webrtc.muted);
   }, [webrtc.muted, setStoreMuted]);

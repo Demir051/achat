@@ -37,6 +37,7 @@ export interface ServerSummary {
   description?: string;
   welcomeEnabled?: boolean;
   joinAnnouncements?: boolean;
+  locked?: boolean;
   welcomeChannelId?: string | null;
 }
 

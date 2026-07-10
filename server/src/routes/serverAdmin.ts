@@ -31,6 +31,7 @@ serverAdminRouter.patch("/settings", async (req: AuthRequest, res) => {
     iconColor: z.string().optional(),
     welcomeEnabled: z.boolean().optional(),
     joinAnnouncements: z.boolean().optional(),
+    locked: z.boolean().optional(),
     welcomeChannelId: z.string().nullable().optional(),
   });
   const parsed = schema.safeParse(req.body);

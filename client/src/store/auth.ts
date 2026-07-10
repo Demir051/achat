@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
-import { connectSocket, disconnectSocket } from "../lib/socket";
+import { connectSocket, disconnectSocket, getSocket } from "../lib/socket";
 import { useSettings } from "./settings";
 import { useApp } from "./app";
+import { useVoice } from "./voice";
 import type { User } from "../types";
 
 interface AuthState {
@@ -54,6 +55,11 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    const voice = useVoice.getState();
+    if (voice.connectedChannelId) {
+      getSocket()?.emit("voice:leave", voice.connectedChannelId);
+    }
+    useVoice.getState().reset();
     localStorage.removeItem("achat_token");
     disconnectSocket();
     useApp.getState().reset();

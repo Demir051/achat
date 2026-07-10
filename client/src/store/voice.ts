@@ -15,6 +15,7 @@ interface VoiceState {
   removeParticipant: (socketId: string) => void;
   updateParticipant: (socketId: string, patch: Partial<VoiceParticipant>) => void;
   setRoster: (channelId: string, participants: VoiceParticipant[]) => void;
+  removeUserFromRoster: (channelId: string, userId: string) => void;
   setMuted: (muted: boolean) => void;
   setScreenSharing: (screenSharing: boolean) => void;
   reset: () => void;
@@ -53,6 +54,14 @@ export const useVoice = create<VoiceState>((set) => ({
   setRoster: (channelId, participants) =>
     set((s) => ({ rosters: { ...s.rosters, [channelId]: participants } })),
 
+  removeUserFromRoster: (channelId, userId) =>
+    set((s) => ({
+      rosters: {
+        ...s.rosters,
+        [channelId]: (s.rosters[channelId] ?? []).filter((p) => p.userId !== userId),
+      },
+    })),
+
   setMuted: (muted) => set({ muted }),
   setScreenSharing: (screenSharing) => set({ screenSharing }),
 
@@ -61,6 +70,7 @@ export const useVoice = create<VoiceState>((set) => ({
       connectedChannelId: null,
       connectedChannelName: null,
       participants: [],
+      rosters: {},
       muted: false,
       screenSharing: false,
     }),

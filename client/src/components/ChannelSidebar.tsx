@@ -124,7 +124,13 @@ export default function ChannelSidebar() {
         <UserPanel />
       </aside>
 
-      {showInvite && <InviteModal code={activeServer.inviteCode} onClose={() => setShowInvite(false)} />}
+      {showInvite && (
+        <InviteModal
+          code={activeServer.inviteCode}
+          locked={activeServer.locked}
+          onClose={() => setShowInvite(false)}
+        />
+      )}
       {showSettings && isOwner && (
         <ServerSettingsModal server={activeServer} onClose={() => setShowSettings(false)} />
       )}

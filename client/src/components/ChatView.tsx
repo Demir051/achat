@@ -5,7 +5,7 @@ import { useAuth } from "../store/auth";
 import { useToast } from "../store/toast";
 import type { DirectMessage, Message, Role } from "../types";
 import Avatar from "./Avatar";
-import EmojiPicker, { MessageContent, insertMention, insertRoleMention } from "./MessageContent";
+import EmojiPicker, { MessageContent, insertMention, insertRoleMention, messageMentionsUser } from "./MessageContent";
 import { HashIcon, SendIcon, UsersIcon } from "./Icons";
 
 function formatTime(iso: string) {
@@ -21,7 +21,7 @@ interface ChatViewProps {
   showMembersToggle?: boolean;
   membersVisible?: boolean;
   onToggleMembers?: () => void;
-  members?: { id: string; username: string; avatarColor: string }[];
+  members?: { id: string; username: string; avatarColor: string; roles?: Role[] }[];
   roles?: Role[];
 }
 
@@ -212,13 +212,15 @@ export default function ChatView({
     ? members.filter((m) => m.username.toLowerCase().startsWith(mentionQuery)).slice(0, 6)
     : [];
 
+  const myRoles = members.find((m) => m.id === user?.id)?.roles ?? [];
+
   return (
     <div className="main">
-      <header className="main-header">
+      <header className={`main-header ${mode === "dm" ? "dm-header" : ""}`}>
         {mode === "channel" && (
           <HashIcon size={20} className="ch-icon" style={{ color: "var(--text-faint)" }} />
         )}
-        <span>{title}</span>
+        <span className={mode === "dm" ? "dm-title" : undefined}>{title}</span>
         {subtitle && <span className="sub">{subtitle}</span>}
         <span className="spacer" />
         {showMembersToggle && (
@@ -246,11 +248,15 @@ export default function ChatView({
               const isOwn = author?.id === user?.id;
               const displayName = isSystem ? (channelMsg.botLabel ?? "Bot") : author?.username ?? "?";
               const avatarColor = isSystem ? "#5865F2" : author?.avatarColor ?? "#5865F2";
+              const authorId = "authorId" in msg ? msg.authorId : (msg as DirectMessage).senderId;
+              const isMentioned =
+                !isSystem &&
+                messageMentionsUser(msg.content, user, myRoles, roles, authorId);
 
               return (
                 <div
                   key={msg.id}
-                  className={`msg ${grouped ? "grouped" : ""} ${isSystem ? "system-msg" : ""}`}
+                  className={`msg ${grouped ? "grouped" : ""} ${isSystem ? "system-msg" : ""} ${isMentioned ? "mentioned" : ""}`}
                   onContextMenu={(e) => {
                     if (mode === "channel" && !isSystem) {
                       e.preventDefault();

@@ -13,7 +13,7 @@ type Tab = "profile" | "appearance" | "audio" | "security";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, setUser } = useAuth();
+  const { user, setUser, logout } = useAuth();
   const { theme, setTheme, micDeviceId, speakerDeviceId, setMicDevice, setSpeakerDevice } =
     useSettings();
   const toast = useToast((s) => s.push);
@@ -95,6 +95,7 @@ export default function Settings() {
       </header>
 
       <div className="settings-body">
+        <div className="settings-columns">
         <nav className="settings-nav glass">
           {([
             ["profile", "Profil"],
@@ -213,6 +214,19 @@ export default function Settings() {
             </>
           )}
         </main>
+        </div>
+
+        <footer className="settings-footer glass">
+          <button
+            className="btn btn-danger settings-logout"
+            onClick={() => {
+              logout();
+              navigate("/login");
+            }}
+          >
+            Oturumu kapat
+          </button>
+        </footer>
       </div>
     </div>
   );

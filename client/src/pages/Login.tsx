@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import Logo from "../components/Logo";
+import { useAuthPageTheme } from "../hooks/useAuthPageTheme";
 import { useAuth } from "../store/auth";
 import "./auth.css";
 
 export default function Login() {
+  useAuthPageTheme();
   const login = useAuth((s) => s.login);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,7 +36,7 @@ export default function Login() {
       <div className="auth-hero">
         <div className="auth-hero-content">
           <div className="auth-hero-logo">
-            <Logo size={52} />
+            <Logo size={64} />
           </div>
           <h1>Konuşmanın en sade hâli.</h1>
           <p>Sunucular kur, sesli sohbete katıl, ekranını paylaş — hepsi tek bir zarif yerde.</p>
@@ -50,7 +52,7 @@ export default function Login() {
       </div>
 
       <div className="auth-panel">
-        <form className="auth-card glass" onSubmit={submit}>
+        <form className="auth-card" onSubmit={submit}>
           <div className="auth-card-logo">
             <Logo size={36} />
           </div>

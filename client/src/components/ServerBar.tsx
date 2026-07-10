@@ -17,7 +17,7 @@ export default function ServerBar() {
           title="Ana sayfa"
           onClick={openHome}
         >
-          <Logo size={34} />
+          <Logo size={44} />
           {!isHome && <span className="pill" />}
         </div>
 

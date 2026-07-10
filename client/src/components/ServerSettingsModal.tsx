@@ -27,6 +27,7 @@ export default function ServerSettingsModal({ server, onClose }: ServerSettingsM
   const [description, setDescription] = useState(server.description ?? "");
   const [welcomeEnabled, setWelcomeEnabled] = useState(server.welcomeEnabled ?? true);
   const [joinAnnouncements, setJoinAnnouncements] = useState(server.joinAnnouncements ?? true);
+  const [locked, setLocked] = useState(server.locked ?? false);
   const [welcomeChannelId, setWelcomeChannelId] = useState(server.welcomeChannelId ?? "");
   const [roles, setRoles] = useState<Role[]>(server.roles ?? []);
   const [bots, setBots] = useState<ServerBot[]>(server.bots ?? []);
@@ -54,6 +55,7 @@ export default function ServerSettingsModal({ server, onClose }: ServerSettingsM
         description,
         welcomeEnabled,
         joinAnnouncements,
+        locked,
         welcomeChannelId: welcomeChannelId || null,
       });
       const welcomeBot = bots.find((b) => b.type === "WELCOME");
@@ -150,6 +152,15 @@ export default function ServerSettingsModal({ server, onClose }: ServerSettingsM
               <input type="checkbox" checked={welcomeEnabled} onChange={(e) => setWelcomeEnabled(e.target.checked)} />
               Karşılama botu aktif
             </label>
+            <label className="ss-check">
+              <input type="checkbox" checked={locked} onChange={(e) => setLocked(e.target.checked)} />
+              Sunucuyu kilitle
+            </label>
+            {locked && (
+              <p className="ss-hint ss-warn">
+                Kilit açıkken davet kodunu paylaşabilirsin; ancak yeni üyeler katılamaz. Mevcut üyeler etkilenmez.
+              </p>
+            )}
 
             <label className="field-label">Karşılama Mesajı</label>
             <input className="input" value={welcomeMsg} onChange={(e) => setWelcomeMsg(e.target.value)} placeholder="Hoş geldin {user}!" />

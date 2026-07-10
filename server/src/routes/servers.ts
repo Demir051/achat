@@ -132,7 +132,9 @@ serverRouter.post("/join", async (req: AuthRequest, res) => {
 
   if (!server) return res.status(404).json({ error: "Geçersiz davet kodu" });
 
-
+  if (server.locked) {
+    return res.status(403).json({ error: "Bu sunucu kilitli — yeni katılımlar kabul edilmiyor" });
+  }
 
   const already = await prisma.member.findUnique({
 
@@ -249,6 +251,8 @@ serverRouter.get("/:id", async (req: AuthRequest, res) => {
       welcomeEnabled: server.welcomeEnabled,
 
       joinAnnouncements: server.joinAnnouncements,
+
+      locked: server.locked,
 
       welcomeChannelId: server.welcomeChannelId,
 

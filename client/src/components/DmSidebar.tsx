@@ -7,7 +7,7 @@ import UserPanel from "./UserPanel";
 import { UsersIcon } from "./Icons";
 
 export default function DmSidebar() {
-  const { activeDmUserId, setActiveDm } = useApp();
+  const { activeDmUserId, unreadDmIds, setActiveDm } = useApp();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [showFriends, setShowFriends] = useState(!activeDmUserId);
@@ -58,7 +58,7 @@ export default function DmSidebar() {
           friends.map((f) => (
             <div
               key={f.id}
-              className={`channel-item ${activeDmUserId === f.id ? "active" : ""}`}
+              className={`channel-item ${activeDmUserId === f.id ? "active" : ""} ${unreadDmIds.includes(f.id) ? "dm-unread" : ""}`}
               onClick={() => openDm(f)}
             >
               <Avatar name={f.username} color={f.avatarColor} size={24} />

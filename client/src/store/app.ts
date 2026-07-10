@@ -27,6 +27,7 @@ interface AppState {
   activeServer: ServerDetail | null;
   activeChannel: Channel | null;
   activeDmUserId: string | null;
+  unreadDmIds: string[];
   ready: boolean;
   sessionUserId: string | null;
 
@@ -37,6 +38,7 @@ interface AppState {
   refreshActiveServer: () => Promise<void>;
   setActiveChannel: (channel: Channel) => void;
   setActiveDm: (userId: string | null) => void;
+  addUnreadDm: (userId: string) => void;
   addServer: (server: ServerSummary) => void;
   reset: () => void;
 }
@@ -47,6 +49,7 @@ export const useApp = create<AppState>((set, get) => ({
   activeServer: null,
   activeChannel: null,
   activeDmUserId: null,
+  unreadDmIds: [],
   ready: false,
   sessionUserId: null,
 
@@ -103,7 +106,23 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
-  setActiveDm: (userId) => set({ activeDmUserId: userId }),
+  setActiveDm: (userId) => {
+    if (userId) {
+      set((s) => ({
+        activeDmUserId: userId,
+        unreadDmIds: s.unreadDmIds.filter((id) => id !== userId),
+      }));
+    } else {
+      set({ activeDmUserId: null });
+    }
+  },
+
+  addUnreadDm: (userId) => {
+    set((s) => {
+      if (s.activeDmUserId === userId || s.unreadDmIds.includes(userId)) return s;
+      return { unreadDmIds: [...s.unreadDmIds, userId] };
+    });
+  },
 
   addServer: (server) => set((s) => ({ servers: [...s.servers, server] })),
 
@@ -114,6 +133,7 @@ export const useApp = create<AppState>((set, get) => ({
       activeServer: null,
       activeChannel: null,
       activeDmUserId: null,
+      unreadDmIds: [],
       ready: false,
       sessionUserId: null,
     }),

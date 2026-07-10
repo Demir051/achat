@@ -40,6 +40,7 @@ model Server {
   ownerId           String
   welcomeEnabled    Boolean  @default(true)
   joinAnnouncements Boolean  @default(true)
+  locked            Boolean  @default(false)
   welcomeChannelId  String?
   createdAt         DateTime @default(now())
 

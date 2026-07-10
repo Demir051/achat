@@ -1,10 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../store/auth";
 import Avatar from "./Avatar";
-import { LogoutIcon, SettingsIcon } from "./Icons";
+import { SettingsIcon } from "./Icons";
 
 export default function UserPanel() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   if (!user) return null;
 
@@ -17,9 +17,6 @@ export default function UserPanel() {
       </div>
       <button className="icon-btn" title="Ayarlar" onClick={() => navigate("/settings")}>
         <SettingsIcon size={18} />
-      </button>
-      <button className="icon-btn" title="Çıkış yap" onClick={logout}>
-        <LogoutIcon size={18} />
       </button>
     </div>
   );

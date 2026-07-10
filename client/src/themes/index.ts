@@ -201,3 +201,12 @@ export function applyTheme(themeId: string) {
   root.dataset.wallpaper = t.wallpaper;
   root.dataset.themeCategory = t.category;
 }
+
+/** Giriş/kayıt — herkeste aynı midnight görünüm */
+export function applyStandardAuthTheme() {
+  applyTheme("midnight");
+  const root = document.documentElement;
+  root.dataset.theme = "auth";
+  root.dataset.themeCategory = "classic";
+  root.dataset.wallpaper = "";
+}

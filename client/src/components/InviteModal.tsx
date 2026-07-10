@@ -2,7 +2,15 @@ import { useState } from "react";
 import Modal from "./Modal";
 import { CopyIcon } from "./Icons";
 
-export default function InviteModal({ code, onClose }: { code: string; onClose: () => void }) {
+export default function InviteModal({
+  code,
+  locked = false,
+  onClose,
+}: {
+  code: string;
+  locked?: boolean;
+  onClose: () => void;
+}) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -14,7 +22,11 @@ export default function InviteModal({ code, onClose }: { code: string; onClose: 
   return (
     <Modal onClose={onClose}>
       <h3>Arkadaşlarını davet et</h3>
-      <p className="modal-sub">Bu kodu paylaşarak sunucuna katılmalarını sağla.</p>
+      <p className="modal-sub">
+        {locked
+          ? "Sunucu kilitli — kodu paylaşabilirsin ancak yeni üyeler katılamaz."
+          : "Bu kodu paylaşarak sunucuna katılmalarını sağla."}
+      </p>
 
       <label className="field-label">Davet kodu</label>
       <div className="invite-code-box">

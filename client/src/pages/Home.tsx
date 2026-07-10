@@ -26,7 +26,8 @@ import VoiceRoom from "../components/VoiceRoom";
 
 import { useVoice } from "../store/voice";
 
-import type { Member } from "../types";
+import type { DirectMessage, Member } from "../types";
+import { getSocket } from "../lib/socket";
 import "./app.css";
 
 
@@ -34,7 +35,7 @@ import "./app.css";
 function HomeContent() {
 
   const { user } = useAuth();
-  const { view, activeServer, activeChannel, activeDmUserId, ready, restoreSession, setActiveChannel } =
+  const { view, activeServer, activeChannel, activeDmUserId, ready, restoreSession, setActiveChannel, addUnreadDm } =
     useApp();
 
   const connectedChannelId = useVoice((s) => s.connectedChannelId);
@@ -73,6 +74,24 @@ function HomeContent() {
     });
 
   }, [activeDmUserId]);
+
+
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !user) return;
+
+    const onDm = (msg: DirectMessage) => {
+      if (msg.senderId === user.id) return;
+      if (msg.senderId === activeDmUserId) return;
+      addUnreadDm(msg.senderId);
+    };
+
+    socket.on("dm:message", onDm);
+    return () => {
+      socket.off("dm:message", onDm);
+    };
+  }, [user, activeDmUserId, addUnreadDm]);
 
 
 
@@ -188,7 +207,11 @@ function HomeContent() {
 
 
 
-  const isTextChannel = view.kind === "server" && activeChannel?.type === "TEXT";
+  const showMembersPanel =
+    view.kind === "server" &&
+    activeServer &&
+    showMembers &&
+    (activeChannel?.type === "TEXT" || inVoiceView);
 
 
 
@@ -216,10 +239,10 @@ function HomeContent() {
 
           {renderMain()}
 
-          {isTextChannel && showMembers && !selectedMember && (
+          {showMembersPanel && !selectedMember && (
             <MemberList onSelectMember={setSelectedMember} />
           )}
-          {isTextChannel && selectedMember && activeServer && (
+          {showMembersPanel && selectedMember && activeServer && (
             <MemberDetailPanel
               userId={selectedMember.id}
               serverId={activeServer.id}
