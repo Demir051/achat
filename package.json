@@ -1,0 +1,11 @@
+{
+  "name": "achat",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "db:push": "npm run db:push --prefix server",
+    "build": "npm run build --prefix server && npm run build --prefix client"
+  }
+}

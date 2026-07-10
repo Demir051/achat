@@ -1,0 +1,167 @@
+// achat veritabanı şeması — SQLite (dev) / PostgreSQL (prod)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  username        String   @unique
+  email           String   @unique
+  password        String
+  avatarColor     String   @default("#5865F2")
+  bio             String   @default("")
+  theme           String   @default("midnight")
+  micDeviceId     String   @default("")
+  speakerDeviceId String   @default("")
+  statusMessage   String   @default("")
+  createdAt       DateTime @default(now())
+
+  ownedServers Server[]        @relation("ServerOwner")
+  memberships  Member[]
+  messages     Message[]
+  sentDMs      DirectMessage[] @relation("DMSender")
+  receivedDMs  DirectMessage[] @relation("DMReceiver")
+  sentReq      Friendship[]    @relation("FriendRequester")
+  recvReq      Friendship[]    @relation("FriendAddressee")
+}
+
+model Server {
+  id                String   @id @default(cuid())
+  name              String
+  iconColor         String   @default("#5865F2")
+  description       String   @default("")
+  inviteCode        String   @unique
+  ownerId           String
+  welcomeEnabled    Boolean  @default(true)
+  joinAnnouncements Boolean  @default(true)
+  welcomeChannelId  String?
+  createdAt         DateTime @default(now())
+
+  owner    User        @relation("ServerOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members  Member[]
+  channels Channel[]
+  roles    Role[]
+  bots     ServerBot[]
+
+  @@index([ownerId])
+}
+
+model Role {
+  id          String @id @default(cuid())
+  serverId    String
+  name        String
+  color       String @default("#99aab5")
+  position    Int    @default(0)
+  mentionable Boolean @default(true)
+
+  server      Server       @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  memberRoles MemberRole[]
+
+  @@unique([serverId, name])
+  @@index([serverId])
+}
+
+model Member {
+  id       String   @id @default(cuid())
+  userId   String
+  serverId String
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  server      Server       @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  memberRoles MemberRole[]
+
+  @@unique([userId, serverId])
+  @@index([serverId])
+  @@index([userId])
+}
+
+model MemberRole {
+  memberId String
+  roleId   String
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, roleId])
+}
+
+model ServerBot {
+  id       String  @id @default(cuid())
+  serverId String
+  type     String
+  name     String
+  enabled  Boolean @default(true)
+  config   String  @default("{}")
+
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId])
+}
+
+model Channel {
+  id       String @id @default(cuid())
+  name     String
+  type     String @default("TEXT")
+  position Int    @default(0)
+  serverId String
+
+  server   Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([serverId])
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  content   String
+  channelId String
+  authorId  String?
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+  deleted   Boolean   @default(false)
+  system    Boolean   @default(false)
+  botLabel  String?
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author  User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([channelId, createdAt])
+  @@index([authorId])
+}
+
+model DirectMessage {
+  id         String   @id @default(cuid())
+  content    String
+  senderId   String
+  receiverId String
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("DMSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("DMReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, receiverId, createdAt])
+  @@index([receiverId, senderId, createdAt])
+}
+
+model Friendship {
+  id          String   @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+
+  requester User @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId])
+  @@index([addresseeId])
+}
