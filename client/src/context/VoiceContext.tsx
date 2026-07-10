@@ -6,6 +6,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { unlockAudioPlayback } from "../lib/audioUnlock";
 import { getSocket } from "../lib/socket";
 import { playSound } from "../lib/sounds";
 import { useWebRTC } from "../hooks/useWebRTC";
@@ -66,6 +67,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     try {
       webrtcRef.current?.stopAll();
       setParticipants([]);
+      await unlockAudioPlayback();
       const stream = await webrtcRef.current?.startLocalAudio();
       if (!stream) {
         toast("Mikrofon açılamadı", "error");
@@ -216,6 +218,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         setConnected(channelId, channelName);
         setParticipants([]);
 
+        await unlockAudioPlayback();
         const stream = await webrtcRef.current?.startLocalAudio();
         if (!stream) {
           toast("Mikrofon izni gerekli", "error");

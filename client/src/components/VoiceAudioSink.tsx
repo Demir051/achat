@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { unlockAudioPlayback } from "../lib/audioUnlock";
 import { useVoiceSession } from "../context/VoiceContext";
 import { useSettings } from "../store/settings";
 import { useVoice } from "../store/voice";
@@ -6,7 +7,6 @@ import { useVoice } from "../store/voice";
 function RemoteAudioPlayer({
   stream,
   trackKey,
-  userId,
   volume,
 }: {
   stream: MediaStream;
@@ -26,37 +26,51 @@ function RemoteAudioPlayer({
     const el = ref.current;
     if (!el) return;
 
-    const attach = () => {
-      const tracks = stream.getAudioTracks().filter((t) => t.readyState !== "ended" && t.enabled);
+    const play = async () => {
+      const tracks = stream.getAudioTracks().filter((t) => t.readyState !== "ended");
       if (!tracks.length) {
         el.srcObject = null;
         return;
       }
-      const ms = new MediaStream(tracks);
-      el.srcObject = ms;
+      el.srcObject = stream;
       el.volume = Math.max(0, Math.min(1, volume / 100));
-      void el.play().catch(() => {});
+      try {
+        await el.play();
+      } catch {
+        await unlockAudioPlayback();
+        try {
+          await el.play();
+        } catch {
+          /* kullanıcı etkileşimi gerekebilir */
+        }
+      }
     };
 
-    attach();
-    stream.addEventListener("addtrack", attach);
-    stream.addEventListener("removetrack", attach);
+    play();
+    stream.addEventListener("addtrack", play);
+    stream.addEventListener("removetrack", play);
     const bound: MediaStreamTrack[] = [];
     for (const track of stream.getAudioTracks()) {
-      track.addEventListener("unmute", attach);
-      track.addEventListener("mute", attach);
-      track.addEventListener("ended", attach);
+      track.addEventListener("unmute", play);
+      track.addEventListener("mute", play);
+      track.addEventListener("ended", play);
       bound.push(track);
     }
 
+    const onInteract = () => {
+      void play();
+    };
+    window.addEventListener("pointerdown", onInteract);
+
     return () => {
-      stream.removeEventListener("addtrack", attach);
-      stream.removeEventListener("removetrack", attach);
+      stream.removeEventListener("addtrack", play);
+      stream.removeEventListener("removetrack", play);
       for (const track of bound) {
-        track.removeEventListener("unmute", attach);
-        track.removeEventListener("mute", attach);
-        track.removeEventListener("ended", attach);
+        track.removeEventListener("unmute", play);
+        track.removeEventListener("mute", play);
+        track.removeEventListener("ended", play);
       }
+      window.removeEventListener("pointerdown", onInteract);
     };
   }, [stream, trackKey, volume]);
 

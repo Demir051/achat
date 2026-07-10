@@ -6,6 +6,16 @@ import type { VoiceParticipant } from "../types";
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
+  // Ücretsiz TURN — farklı ağlarda (Netlify↔Render) WebRTC için gerekli
+  {
+    urls: [
+      "turn:openrelay.metered.ca:80",
+      "turn:openrelay.metered.ca:443",
+      "turn:openrelay.metered.ca:443?transport=tcp",
+    ],
+    username: "openrelayproject",
+    credential: "openrelayproject",
+  },
 ];
 
 type TrackPurpose = "mic" | "screenVideo" | "screenAudio";
@@ -35,6 +45,17 @@ function audioTrackKey(stream: MediaStream) {
     .join(",");
 }
 
+function pickScreenVideoTrack(stream: MediaStream): MediaStreamTrack | null {
+  const tracks = stream.getVideoTracks().filter((t) => t.readyState !== "ended");
+  if (!tracks.length) return null;
+  // Ekran paylaşımı track'i genelde displaySurface içerir
+  const screen = tracks.find((t) => {
+    const s = t.getSettings();
+    return Boolean(s.displaySurface);
+  });
+  return screen ?? tracks[tracks.length - 1];
+}
+
 export function useWebRTC(channelId: string | null, participants: VoiceParticipant[]) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -48,7 +69,7 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
   const remoteStreamMapRef = useRef<Map<string, MediaStream>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
-  const prevPeerCountRef = useRef(0);
+  const knownPeersRef = useRef<Set<string>>(new Set());
 
   const getPeerMeta = useCallback((remoteSocketId: string): PeerMeta => {
     let meta = peerMetaRef.current.get(remoteSocketId);
@@ -66,8 +87,6 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
     peersRef.current.forEach((pc, socketId) => {
       const p = participants.find((x) => x.socketId === socketId);
       if (!p) return;
-      const receivers = pc.getReceivers().filter((r) => r.track);
-      if (!receivers.length) return;
 
       let stream = remoteStreamMapRef.current.get(socketId);
       if (!stream) {
@@ -75,16 +94,19 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
         remoteStreamMapRef.current.set(socketId, stream);
       }
 
-      const activeTrackIds = new Set(receivers.map((r) => r.track!.id));
-      stream.getTracks().forEach((track) => {
-        if (!activeTrackIds.has(track.id)) stream!.removeTrack(track);
-      });
-      receivers.forEach((r) => {
-        const track = r.track!;
+      // Receiver'lardan eksik track'leri ekle (ontrack yedek)
+      pc.getReceivers().forEach((r) => {
+        const track = r.track;
+        if (!track || track.readyState === "ended") return;
         if (!stream!.getTracks().some((t) => t.id === track.id)) {
           stream!.addTrack(track);
         }
       });
+
+      const hasMedia = stream.getTracks().some((t) => t.readyState !== "ended");
+      if (!hasMedia) return;
+
+      const videoTrack = pickScreenVideoTrack(stream);
 
       list.push({
         socketId,
@@ -93,24 +115,27 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
         avatarColor: p.avatarColor,
         stream,
         screenSharing: p.screenSharing,
-        videoTrackId: stream.getVideoTracks()[0]?.id ?? null,
+        videoTrackId: videoTrack?.id ?? null,
         audioTrackKey: audioTrackKey(stream),
       });
     });
     setRemoteStreams(list);
   }, [participants]);
 
-  const flushCandidates = useCallback(async (remoteSocketId: string, pc: RTCPeerConnection) => {
-    const meta = getPeerMeta(remoteSocketId);
-    const queued = meta.pendingCandidates.splice(0);
-    for (const c of queued) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(c));
-      } catch {
-        /* ignore */
+  const flushCandidates = useCallback(
+    async (remoteSocketId: string, pc: RTCPeerConnection) => {
+      const meta = getPeerMeta(remoteSocketId);
+      const queued = meta.pendingCandidates.splice(0);
+      for (const c of queued) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(c));
+        } catch {
+          /* ignore */
+        }
       }
-    }
-  }, [getPeerMeta]);
+    },
+    [getPeerMeta]
+  );
 
   const getSenderMap = useCallback((remoteSocketId: string) => {
     let map = sendersRef.current.get(remoteSocketId);
@@ -134,10 +159,18 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
 
       if (!track) {
         if (existing) {
-          pc.removeTrack(existing);
+          try {
+            pc.removeTrack(existing);
+          } catch {
+            /* ignore */
+          }
           map.delete(purpose);
         }
         return;
+      }
+
+      if (purpose === "screenVideo") {
+        track.contentHint = "detail";
       }
 
       if (existing?.track?.id === track.id) return;
@@ -158,7 +191,13 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
       const mic = localStreamRef.current;
       const screen = screenStreamRef.current;
 
-      setTrackOnPeer(pc, remoteSocketId, "mic", mic?.getAudioTracks()[0] ?? null, mic ?? new MediaStream());
+      setTrackOnPeer(
+        pc,
+        remoteSocketId,
+        "mic",
+        mic?.getAudioTracks()[0] ?? null,
+        mic ?? new MediaStream()
+      );
       setTrackOnPeer(
         pc,
         remoteSocketId,
@@ -186,7 +225,7 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
       const meta = getPeerMeta(remoteSocketId);
       if (meta.makingOffer) return;
       if (!force && socket.id >= remoteSocketId) return;
-      if (pc.signalingState !== "stable") return;
+      if (pc.signalingState !== "stable" && pc.signalingState !== "have-local-offer") return;
 
       meta.makingOffer = true;
       try {
@@ -206,24 +245,46 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
     [addTracksToPeer, getPeerMeta]
   );
 
-  const renegotiatePeers = useCallback(
-    async (force = false) => {
-      for (const remoteSocketId of peersRef.current.keys()) {
-        await sendOffer(remoteSocketId, force);
+  const attachRemoteTrack = useCallback(
+    (remoteSocketId: string, track: MediaStreamTrack, evStream?: MediaStream) => {
+      let stream = remoteStreamMapRef.current.get(remoteSocketId);
+      if (!stream) {
+        stream = evStream ?? new MediaStream();
+        remoteStreamMapRef.current.set(remoteSocketId, stream);
       }
+
+      if (!stream.getTracks().some((t) => t.id === track.id)) {
+        stream.addTrack(track);
+      }
+
+      const refresh = () => syncRemoteStreams();
+      track.addEventListener("unmute", refresh);
+      track.addEventListener("mute", refresh);
+      track.addEventListener("ended", () => {
+        try {
+          stream!.removeTrack(track);
+        } catch {
+          /* ignore */
+        }
+        refresh();
+      });
+
+      refresh();
+      setTimeout(refresh, 100);
+      setTimeout(refresh, 500);
     },
-    [sendOffer]
+    [syncRemoteStreams]
   );
 
   const createPeer = useCallback(
     (remoteSocketId: string) => {
       if (peersRef.current.has(remoteSocketId)) return peersRef.current.get(remoteSocketId)!;
 
-      const socket = getSocket();
       getPeerMeta(remoteSocketId);
 
       const pc = new RTCPeerConnection({
         iceServers: ICE_SERVERS,
+        iceTransportPolicy: "all",
         bundlePolicy: "max-bundle",
       });
       peersRef.current.set(remoteSocketId, pc);
@@ -236,10 +297,10 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
         });
       };
 
-      pc.ontrack = () => {
-        syncRemoteStreams();
-        setTimeout(syncRemoteStreams, 50);
-        setTimeout(syncRemoteStreams, 250);
+      pc.ontrack = (ev) => {
+        if (ev.track) {
+          attachRemoteTrack(remoteSocketId, ev.track, ev.streams[0]);
+        }
       };
 
       pc.onconnectionstatechange = () => {
@@ -253,6 +314,12 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
         if (pc.connectionState === "connected") syncRemoteStreams();
       };
 
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+          syncRemoteStreams();
+        }
+      };
+
       pc.onnegotiationneeded = () => {
         void sendOffer(remoteSocketId, false);
       };
@@ -261,7 +328,7 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
 
       return pc;
     },
-    [addTracksToPeer, getPeerMeta, sendOffer, syncRemoteStreams]
+    [addTracksToPeer, attachRemoteTrack, getPeerMeta, sendOffer, syncRemoteStreams]
   );
 
   const handleSignal = useCallback(
@@ -346,7 +413,7 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
     peerMetaRef.current.clear();
     sendersRef.current.clear();
     remoteStreamMapRef.current.clear();
-    prevPeerCountRef.current = 0;
+    knownPeersRef.current.clear();
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
@@ -370,9 +437,8 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
       setTrackOnPeer(pc, remoteSocketId, "screenAudio", null, new MediaStream());
     });
 
-    void renegotiatePeers(true);
     if (channelId) getSocket()?.emit("voice:state", { channelId, screenSharing: false });
-  }, [channelId, renegotiatePeers, setTrackOnPeer]);
+  }, [channelId, setTrackOnPeer]);
 
   const toggleMute = useCallback(() => {
     const stream = localStreamRef.current;
@@ -399,13 +465,14 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
           height: { ideal: 1080 },
           frameRate: { ideal: 24, max: 30 },
         },
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          suppressLocalAudioPlayback: false,
-        } as MediaTrackConstraints,
-      });
+        audio: true,
+        preferCurrentTab: false,
+      } as DisplayMediaStreamOptions);
+
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.contentHint = "detail";
+      }
 
       screenStreamRef.current = stream;
       setScreenStream(stream);
@@ -418,28 +485,36 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
       });
 
       if (channelId) getSocket()?.emit("voice:state", { channelId, screenSharing: true });
-      await renegotiatePeers(true);
       return true;
     } catch {
       return false;
     }
-  }, [addTracksToPeer, channelId, renegotiatePeers, stopScreenShare]);
+  }, [addTracksToPeer, channelId, stopScreenShare]);
 
   useEffect(() => {
     if (!channelId) return;
     const socket = getSocket();
     if (!socket) return;
 
-    let addedPeer = false;
+    const myId = socket.id;
+    const nextKnown = new Set<string>();
+
     participants.forEach((p) => {
-      if (p.socketId !== socket.id && !peersRef.current.has(p.socketId)) {
+      if (p.socketId === myId) return;
+      nextKnown.add(p.socketId);
+
+      const isNew = !knownPeersRef.current.has(p.socketId);
+      if (!peersRef.current.has(p.socketId)) {
         createPeer(p.socketId);
-        addedPeer = true;
+      }
+      // Sadece yeni katılan peer ile müzakere — mevcut bağlantıları bozma
+      if (isNew) {
+        void sendOffer(p.socketId, false);
       }
     });
 
     peersRef.current.forEach((_, socketId) => {
-      if (!participants.some((p) => p.socketId === socketId)) {
+      if (!nextKnown.has(socketId)) {
         peersRef.current.get(socketId)?.close();
         peersRef.current.delete(socketId);
         peerMetaRef.current.delete(socketId);
@@ -448,19 +523,15 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
       }
     });
 
-    const count = peersRef.current.size;
-    if (addedPeer || count > prevPeerCountRef.current) {
-      void renegotiatePeers(true);
-    }
-    prevPeerCountRef.current = count;
+    knownPeersRef.current = nextKnown;
     syncRemoteStreams();
-  }, [channelId, participants, createPeer, renegotiatePeers, syncRemoteStreams]);
+  }, [channelId, participants, createPeer, sendOffer, syncRemoteStreams]);
 
   useEffect(() => {
     if (!channelId || !localStream) return;
     peersRef.current.forEach((pc, remoteSocketId) => addTracksToPeer(pc, remoteSocketId));
-    void renegotiatePeers(true);
-  }, [channelId, localStream, addTracksToPeer, renegotiatePeers]);
+    // negotiationneeded otomatik tetiklenir — tüm peer'lara force offer gönderme
+  }, [channelId, localStream, addTracksToPeer]);
 
   useEffect(() => {
     syncRemoteStreams();

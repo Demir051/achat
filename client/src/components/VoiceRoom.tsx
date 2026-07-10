@@ -23,6 +23,7 @@ function StreamVideo({
   className?: string;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const videoTrackId = stream.getVideoTracks()[0]?.id ?? "none";
 
   useEffect(() => {
     const el = ref.current;
@@ -34,11 +35,12 @@ function StreamVideo({
         el.srcObject = null;
         return;
       }
-      const ms = new MediaStream(tracks);
-      if (el.srcObject !== ms) {
-        el.srcObject = ms;
-      }
-      void el.play().catch(() => {});
+      el.srcObject = stream;
+      const play = () => {
+        void el.play().catch(() => {});
+      };
+      if (el.readyState >= 2) play();
+      else el.onloadeddata = play;
     };
 
     attach();
@@ -53,6 +55,7 @@ function StreamVideo({
     }
 
     return () => {
+      el.onloadeddata = null;
       stream.removeEventListener("addtrack", attach);
       stream.removeEventListener("removetrack", attach);
       for (const track of trackListeners) {
@@ -61,9 +64,18 @@ function StreamVideo({
         track.removeEventListener("ended", attach);
       }
     };
-  }, [stream]);
+  }, [stream, videoTrackId]);
 
-  return <video ref={ref} className={className} autoPlay playsInline muted />;
+  return (
+    <video
+      key={videoTrackId}
+      ref={ref}
+      className={className}
+      autoPlay
+      playsInline
+      muted
+    />
+  );
 }
 
 export default function VoiceRoom({
