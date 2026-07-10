@@ -14,6 +14,10 @@ import { initSocket } from "./socket/index.js";
 
 const app = express();
 
+if (env.isProd) {
+  app.set("trust proxy", 1);
+}
+
 app.use(
   helmet({
     contentSecurityPolicy: env.isProd ? undefined : false,
