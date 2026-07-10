@@ -722,6 +722,56 @@ html[data-theme-category="series"] .msg.mentioned:hover {
   box-shadow: 0 0 0 2px var(--accent-soft);
   z-index: 2;
 }
+.voice-volume-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.voice-tile:hover .voice-volume-btn,
+.voice-tile.volume-open .voice-volume-btn {
+  opacity: 1;
+}
+.voice-volume-btn:hover {
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--accent);
+}
+.voice-share-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.voice-tile.has-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  border-radius: inherit;
+}
+.voice-tile.share-pending {
+  border-color: var(--green);
+}
+.vt-sharing {
+  color: var(--green);
+}
 .voice-volume-pop {
   position: absolute;
   inset: 0;

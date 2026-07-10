@@ -35,10 +35,9 @@ function StreamVideo({
         el.srcObject = null;
         return;
       }
-      el.srcObject = stream;
-      const play = () => {
-        void el.play().catch(() => {});
-      };
+      const ms = new MediaStream(tracks);
+      el.srcObject = ms;
+      const play = () => void el.play().catch(() => {});
       if (el.readyState >= 2) play();
       else el.onloadeddata = play;
     };
@@ -46,19 +45,19 @@ function StreamVideo({
     attach();
     stream.addEventListener("addtrack", attach);
     stream.addEventListener("removetrack", attach);
-    const trackListeners: MediaStreamTrack[] = [];
+    const bound: MediaStreamTrack[] = [];
     for (const track of stream.getVideoTracks()) {
       track.addEventListener("unmute", attach);
       track.addEventListener("mute", attach);
       track.addEventListener("ended", attach);
-      trackListeners.push(track);
+      bound.push(track);
     }
 
     return () => {
       el.onloadeddata = null;
       stream.removeEventListener("addtrack", attach);
       stream.removeEventListener("removetrack", attach);
-      for (const track of trackListeners) {
+      for (const track of bound) {
         track.removeEventListener("unmute", attach);
         track.removeEventListener("mute", attach);
         track.removeEventListener("ended", attach);
@@ -129,7 +128,7 @@ export default function VoiceRoom({
     if (!volumeUserId) return;
     const onPointerDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest(".voice-volume-pop") && !target.closest(".voice-tile.volume-open")) {
+      if (!target.closest(".voice-volume-pop") && !target.closest(".voice-volume-btn")) {
         setVolumeUserId(null);
       }
     };
@@ -140,7 +139,7 @@ export default function VoiceRoom({
   useEffect(() => {
     if (!focusedId || focusedId === "self") return;
     const stillSharing = remoteStreams.some(
-      (r) => r.socketId === focusedId && r.stream.getVideoTracks().length > 0
+      (r) => r.socketId === focusedId && r.screenSharing
     );
     if (!stillSharing) setFocusedId(null);
   }, [focusedId, remoteStreams]);
@@ -151,9 +150,9 @@ export default function VoiceRoom({
 
   const others = participants.filter((p) => p.userId !== user?.id);
 
-  const toggleFocus = (id: string, canFocus: boolean) => {
-    if (!canFocus) return;
+  const toggleFocus = (id: string) => {
     setFocusedId((prev) => (prev === id ? null : id));
+    setVolumeUserId(null);
   };
 
   const focusedRemote = focusedId && focusedId !== "self"
@@ -167,33 +166,66 @@ export default function VoiceRoom({
     avatarColor: string,
     isMuted: boolean,
     isSharing: boolean,
-    stream: MediaStream | null,
+    videoStream: MediaStream | null,
     isSelf = false,
     videoKey?: string | null
   ) => {
-    const showVideo = isSharing && stream && stream.getVideoTracks().length > 0;
+    const hasVideo = !!videoStream && videoStream.getVideoTracks().length > 0;
     const isFocused = focusedId === id;
     const volumeOpen = volumeUserId === userId;
     const volume = peerVolumes[userId] ?? 100;
     const screenVolume = peerScreenVolumes[userId] ?? 100;
-    const hasScreenAudio = isSharing;
 
-    const handleClick = () => {
-      if (isSelf) return;
+    const handleTileClick = () => {
+      if (isSelf) {
+        if (isSharing && hasVideo) toggleFocus("self");
+        return;
+      }
+      if (isSharing) {
+        toggleFocus(id);
+        return;
+      }
       setVolumeUserId((prev) => (prev === userId ? null : userId));
     };
 
     return (
       <div
         key={id}
-        className={`voice-tile ${!isMuted ? "speaking" : ""} ${showVideo ? "shareable" : ""} ${isFocused ? "focused-thumb" : ""} ${volumeOpen ? "volume-open" : ""} ${!isSelf ? "clickable" : ""}`}
-        onClick={handleClick}
-        title={isSelf ? undefined : "Ses seviyesi ayarla"}
+        className={`voice-tile ${!isMuted ? "speaking" : ""} ${hasVideo ? "shareable has-video" : ""} ${isSharing && !hasVideo ? "share-pending" : ""} ${isFocused ? "focused-thumb" : ""} ${volumeOpen ? "volume-open" : ""} ${!isSelf || (isSharing && hasVideo) ? "clickable" : ""}`}
+        onClick={handleTileClick}
+        title={
+          isSharing
+            ? hasVideo
+              ? "Ekranı büyüt / küçült"
+              : "Ekran paylaşımı bağlanıyor…"
+            : isSelf
+              ? undefined
+              : "Ses seviyesi"
+        }
       >
-        {showVideo && stream ? (
-          <StreamVideo key={videoKey ?? id} stream={stream} />
+        {hasVideo && videoStream ? (
+          <StreamVideo key={videoKey ?? id} stream={videoStream} />
+        ) : isSharing ? (
+          <div className="voice-share-pending">
+            <ScreenIcon size={32} />
+            <span>Bağlanıyor…</span>
+          </div>
         ) : (
           <Avatar name={username} color={avatarColor} size={72} />
+        )}
+
+        {!isSelf && (
+          <button
+            type="button"
+            className="voice-volume-btn"
+            title="Ses seviyesi"
+            onClick={(e) => {
+              e.stopPropagation();
+              setVolumeUserId((prev) => (prev === userId ? null : userId));
+            }}
+          >
+            <VolumeIcon size={16} />
+          </button>
         )}
 
         {volumeOpen && !isSelf && (
@@ -220,7 +252,7 @@ export default function VoiceRoom({
               {volume === 0 && <span className="voice-volume-muted">Sessiz</span>}
             </div>
 
-            {hasScreenAudio && (
+            {isSharing && (
               <>
                 <label className="voice-volume-label">
                   <ScreenIcon size={14} />
@@ -241,14 +273,11 @@ export default function VoiceRoom({
               </>
             )}
 
-            {showVideo && (
+            {hasVideo && (
               <button
                 type="button"
                 className="btn btn-ghost btn-sm voice-volume-expand"
-                onClick={() => {
-                  toggleFocus(id, true);
-                  setVolumeUserId(null);
-                }}
+                onClick={() => toggleFocus(id)}
               >
                 Ekranı büyüt
               </button>
@@ -265,7 +294,7 @@ export default function VoiceRoom({
               {volume}%
             </span>
           )}
-          {!isSelf && hasScreenAudio && screenVolume !== 100 && (
+          {!isSelf && isSharing && screenVolume !== 100 && (
             <span className="vt-volume vt-screen-volume" title={`Ekran sesi: ${screenVolume}%`}>
               <ScreenIcon size={12} />
               {screenVolume}%
@@ -277,7 +306,7 @@ export default function VoiceRoom({
             </span>
           )}
           {isSharing && (
-            <span>
+            <span className="vt-sharing">
               <ScreenIcon size={14} />
             </span>
           )}
@@ -323,11 +352,11 @@ export default function VoiceRoom({
           </div>
         )}
 
-        {focusedRemote && (
+        {focusedRemote && focusedRemote.videoStream && (
           <div className="voice-focus-panel">
             <StreamVideo
               key={focusedRemote.videoTrackId ?? focusedRemote.socketId}
-              stream={focusedRemote.stream}
+              stream={focusedRemote.videoStream}
               className="voice-focus-video"
             />
             <div className="voice-focus-bar">
@@ -341,11 +370,19 @@ export default function VoiceRoom({
 
         <div className={`voice-grid ${focusedId ? "compact" : ""}`}>
           {user &&
-            renderTile("self", user.id, user.username, user.avatarColor, muted, screenSharing, screenStream, true)}
+            renderTile(
+              "self",
+              user.id,
+              user.username,
+              user.avatarColor,
+              muted,
+              screenSharing,
+              screenStream,
+              true
+            )}
 
           {remoteStreams.map((r) => {
             const p = others.find((x) => x.socketId === r.socketId);
-            const showVideo = p?.screenSharing && r.stream.getVideoTracks().length > 0;
             return renderTile(
               r.socketId,
               r.userId,
@@ -353,7 +390,7 @@ export default function VoiceRoom({
               r.avatarColor,
               !!p?.muted,
               !!p?.screenSharing,
-              showVideo ? r.stream : null,
+              r.videoStream,
               false,
               r.videoTrackId
             );
