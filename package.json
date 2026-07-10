@@ -5,6 +5,8 @@
   "scripts": {
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
     "db:push": "npm run db:push --prefix server",
     "build": "npm run build --prefix server && npm run build --prefix client"
   }

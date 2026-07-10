@@ -1,11 +1,11 @@
-// achat veritabanı şeması — SQLite (dev) / PostgreSQL (prod)
+// achat veritabanı şeması — PostgreSQL
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

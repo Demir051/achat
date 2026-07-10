@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: achat
+      POSTGRES_PASSWORD: achat
+      POSTGRES_DB: achat
+    ports:
+      - "5432:5432"
+    volumes:
+      - achat_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U achat -d achat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  achat_pg_data:
