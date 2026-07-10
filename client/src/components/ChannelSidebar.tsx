@@ -12,7 +12,7 @@ import ServerSettingsModal from "./ServerSettingsModal";
 import UserPanel from "./UserPanel";
 import { HashIcon, PlusIcon, SettingsIcon, VolumeIcon, UserPlusIcon } from "./Icons";
 
-export default function ChannelSidebar() {
+export default function ChannelSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { activeServer, activeChannel, setActiveChannel } = useApp();
   const user = useAuth((s) => s.user);
   const rosters = useVoice((s) => s.rosters);
@@ -39,6 +39,7 @@ export default function ChannelSidebar() {
 
   const selectTextChannel = (ch: Channel) => {
     setActiveChannel(ch);
+    onNavigate?.();
   };
 
   const selectVoiceChannel = async (ch: Channel) => {
@@ -46,6 +47,7 @@ export default function ChannelSidebar() {
       await joinVoice(ch.id, ch.name);
     }
     setActiveChannel(ch);
+    onNavigate?.();
   };
 
   return (

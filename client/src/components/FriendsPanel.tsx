@@ -4,11 +4,17 @@ import { getSocket } from "../lib/socket";
 import { useApp } from "../store/app";
 import type { Friend, FriendRequest } from "../types";
 import Avatar from "./Avatar";
-import { CheckIcon, MessageIcon, UserPlusIcon, XIcon } from "./Icons";
+import { CheckIcon, MenuIcon, MessageIcon, UserPlusIcon, XIcon } from "./Icons";
 
 type Tab = "online" | "pending" | "add";
 
-export default function FriendsPanel() {
+export default function FriendsPanel({
+  showMenuButton,
+  onMenuClick,
+}: {
+  showMenuButton?: boolean;
+  onMenuClick?: () => void;
+}) {
   const setActiveDm = useApp((s) => s.setActiveDm);
   const [tab, setTab] = useState<Tab>("online");
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -84,6 +90,11 @@ export default function FriendsPanel() {
   return (
     <div className="main">
       <header className="main-header">
+        {showMenuButton && (
+          <button type="button" className="hbtn mobile-menu-btn" aria-label="Menü" onClick={onMenuClick}>
+            <MenuIcon size={22} />
+          </button>
+        )}
         <span>Arkadaşlar</span>
         <span className="sub">{onlineFriends.length} çevrimiçi</span>
       </header>

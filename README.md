@@ -126,13 +126,14 @@ Repoyu GitHub’a push et.
 | Değişken | Değer |
 | --- | --- |
 | `NODE_ENV` | `production` |
-| `DATABASE_URL` | Neon connection string |
+| `DATABASE_URL` | Neon **pooler** connection string (`…-pooler…?sslmode=require`) |
+| `DIRECT_URL` | Neon **direct** connection string (pooler olmayan, `?sslmode=require`) |
 | `JWT_SECRET` | uzun rastgele string |
 | `CLIENT_ORIGIN` | *(şimdilik boş — adım 5’te doldur)* |
 
-5. **Build Command:** `npm ci --include=dev && npm run build`  
-6. **Start Command:** `npm start`  
-7. **Release Command:** `npx prisma db push`  
+5. **Build Command:** `npm ci --include=dev && npm run build` *(db push build sırasında çalışmamalı)*  
+6. **Start Command:** `npm start` *(başlangıçta şema otomatik senkronize edilir)*  
+7. **Release Command:** boş bırak  
 8. Deploy bitince API URL’ini al (ör. `https://achat-api.onrender.com`)
 9. Test: `https://achat-api.onrender.com/api/health`
 
@@ -188,7 +189,7 @@ npm run create-user demo demo@achat.local demo1234
 
 | Sorun | Çözüm |
 | --- | --- |
-| DB bağlanamıyor | Neon `DATABASE_URL` doğru mu? `sslmode=require` var mı? |
+| DB bağlanamıyor (P1001) | Neon projesini uyandır; `DATABASE_URL` (pooler) + `DIRECT_URL` (direct) ayarla; `?sslmode=require` ekle; Build Command'da `prisma db push` olmasın |
 | CORS hatası | `CLIENT_ORIGIN` frontend URL ile birebir aynı mı? |
 | Mesaj gitmiyor | `VITE_API_URL` backend URL’i mi? Frontend’i yeniden deploy et |
 | 404 sayfa yenileme | Static site’ta `/* → /index.html` rewrite eklendi mi? |

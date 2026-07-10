@@ -6,7 +6,7 @@ import Avatar from "./Avatar";
 import UserPanel from "./UserPanel";
 import { UsersIcon } from "./Icons";
 
-export default function DmSidebar() {
+export default function DmSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { activeDmUserId, unreadDmIds, setActiveDm } = useApp();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
@@ -25,11 +25,13 @@ export default function DmSidebar() {
   const openFriends = () => {
     setShowFriends(true);
     setActiveDm(null);
+    onNavigate?.();
   };
 
   const openDm = (friend: Friend) => {
     setShowFriends(false);
     setActiveDm(friend.id);
+    onNavigate?.();
   };
 
   return (

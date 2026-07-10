@@ -10,11 +10,13 @@ services:
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
-    releaseCommand: npx prisma db push
+    releaseCommand: npm run db:push:retry
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
         sync: false
       - key: JWT_SECRET
         generateValue: true

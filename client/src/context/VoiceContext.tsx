@@ -9,6 +9,7 @@ import {
 import { getSocket } from "../lib/socket";
 import { playSound } from "../lib/sounds";
 import { useWebRTC } from "../hooks/useWebRTC";
+import VoiceAudioSink from "../components/VoiceAudioSink";
 import { useAuth } from "../store/auth";
 import { useToast } from "../store/toast";
 import { useVoice } from "../store/voice";
@@ -253,11 +254,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   const toggleScreenShare = useCallback(async () => {
     const nowSharing = await webrtcRef.current?.toggleScreenShare();
-    if (typeof nowSharing === "boolean") {
-      setStoreScreenSharing(nowSharing);
-      if (nowSharing) playSound("screenShareStart");
+    if (nowSharing === true) {
+      setStoreScreenSharing(true);
+      playSound("screenShareStart");
+    } else if (nowSharing === false && webrtcRef.current?.screenSharing === false) {
+      setStoreScreenSharing(false);
+    } else if (nowSharing === false) {
+      toast("Ekran paylaşımı başlatılamadı", "error");
     }
-  }, [setStoreScreenSharing]);
+  }, [setStoreScreenSharing, toast]);
 
   useEffect(() => {
     setStoreMuted(webrtc.muted);
@@ -282,6 +287,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         remoteStreams: webrtc.remoteStreams,
       }}
     >
+      <VoiceAudioSink />
       {children}
     </VoiceContext.Provider>
   );

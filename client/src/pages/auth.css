@@ -242,4 +242,14 @@ html.auth-page .auth-wrap .btn:hover:not(:disabled) {
   .auth-hero {
     display: none;
   }
+  .auth-panel {
+    padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+  .auth-card {
+    padding: 24px 20px;
+    border-radius: 14px;
+  }
+  .auth-card h2 {
+    font-size: 22px;
+  }
 }

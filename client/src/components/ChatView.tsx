@@ -6,7 +6,7 @@ import { useToast } from "../store/toast";
 import type { DirectMessage, Message, Role } from "../types";
 import Avatar from "./Avatar";
 import EmojiPicker, { MessageContent, insertMention, insertRoleMention, messageMentionsUser } from "./MessageContent";
-import { HashIcon, SendIcon, UsersIcon } from "./Icons";
+import { HashIcon, MenuIcon, SendIcon, UsersIcon } from "./Icons";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
@@ -23,6 +23,8 @@ interface ChatViewProps {
   onToggleMembers?: () => void;
   members?: { id: string; username: string; avatarColor: string; roles?: Role[] }[];
   roles?: Role[];
+  showMenuButton?: boolean;
+  onMenuClick?: () => void;
 }
 
 export default function ChatView({
@@ -36,6 +38,8 @@ export default function ChatView({
   onToggleMembers,
   members = [],
   roles = [],
+  showMenuButton,
+  onMenuClick,
 }: ChatViewProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<(Message | DirectMessage)[]>([]);
@@ -217,6 +221,11 @@ export default function ChatView({
   return (
     <div className="main">
       <header className={`main-header ${mode === "dm" ? "dm-header" : ""}`}>
+        {showMenuButton && (
+          <button type="button" className="hbtn mobile-menu-btn" aria-label="Menü" onClick={onMenuClick}>
+            <MenuIcon size={22} />
+          </button>
+        )}
         {mode === "channel" && (
           <HashIcon size={20} className="ch-icon" style={{ color: "var(--text-faint)" }} />
         )}

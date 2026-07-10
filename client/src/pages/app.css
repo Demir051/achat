@@ -4,6 +4,13 @@
   background: transparent;
 }
 
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+
 /* ---------- Sunucu bar (sol ray) ---------- */
 .app-loading {
   min-height: 100vh;
@@ -703,6 +710,67 @@ html[data-theme-category="series"] .msg.mentioned:hover {
 }
 .voice-tile.shareable {
   cursor: pointer;
+}
+.voice-tile.clickable {
+  cursor: pointer;
+}
+.voice-tile.clickable:hover {
+  border-color: var(--accent);
+}
+.voice-tile.volume-open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+  z-index: 2;
+}
+.voice-volume-pop {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 14px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  border-radius: inherit;
+}
+.voice-volume-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.voice-volume-slider {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.voice-volume-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.voice-volume-muted {
+  color: var(--red);
+  font-weight: 600;
+}
+.voice-volume-expand {
+  width: 100%;
+  margin-top: 2px;
+}
+.vt-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--accent);
+  opacity: 0.9;
 }
 .voice-tile.shareable:hover {
   border-color: var(--accent);

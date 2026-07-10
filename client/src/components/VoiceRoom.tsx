@@ -3,12 +3,15 @@ import { useAuth } from "../store/auth";
 import { useApp } from "../store/app";
 import { useVoice } from "../store/voice";
 import { useVoiceSession } from "../context/VoiceContext";
+import { useSettings } from "../store/settings";
 import Avatar from "./Avatar";
 import {
+  MenuIcon,
   MicIcon,
   MicOffIcon,
   PhoneOffIcon,
   ScreenIcon,
+  UsersIcon,
   VolumeIcon,
 } from "./Icons";
 
@@ -24,27 +27,58 @@ function StreamVideo({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.srcObject = stream;
-    void el.play().catch(() => {});
+
+    const attach = () => {
+      const tracks = stream.getVideoTracks().filter((t) => t.readyState !== "ended");
+      if (!tracks.length) {
+        el.srcObject = null;
+        return;
+      }
+      const ms = new MediaStream(tracks);
+      if (el.srcObject !== ms) {
+        el.srcObject = ms;
+      }
+      void el.play().catch(() => {});
+    };
+
+    attach();
+    stream.addEventListener("addtrack", attach);
+    stream.addEventListener("removetrack", attach);
+    const trackListeners: MediaStreamTrack[] = [];
+    for (const track of stream.getVideoTracks()) {
+      track.addEventListener("unmute", attach);
+      track.addEventListener("mute", attach);
+      track.addEventListener("ended", attach);
+      trackListeners.push(track);
+    }
+
+    return () => {
+      stream.removeEventListener("addtrack", attach);
+      stream.removeEventListener("removetrack", attach);
+      for (const track of trackListeners) {
+        track.removeEventListener("unmute", attach);
+        track.removeEventListener("mute", attach);
+        track.removeEventListener("ended", attach);
+      }
+    };
   }, [stream]);
 
   return <video ref={ref} className={className} autoPlay playsInline muted />;
 }
 
-function RemoteAudio({ stream }: { stream: MediaStream }) {
-  const ref = useRef<HTMLAudioElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.srcObject = stream;
-    void el.play().catch(() => {});
-  }, [stream]);
-
-  return <audio ref={ref} autoPlay playsInline className="voice-remote-audio" />;
-}
-
-export default function VoiceRoom() {
+export default function VoiceRoom({
+  showMenuButton,
+  onMenuClick,
+  showMembersToggle,
+  membersVisible,
+  onToggleMembers,
+}: {
+  showMenuButton?: boolean;
+  onMenuClick?: () => void;
+  showMembersToggle?: boolean;
+  membersVisible?: boolean;
+  onToggleMembers?: () => void;
+}) {
   const user = useAuth((s) => s.user);
   const activeServer = useApp((s) => s.activeServer);
   const setActiveChannel = useApp((s) => s.setActiveChannel);
@@ -54,8 +88,11 @@ export default function VoiceRoom() {
   const screenSharing = useVoice((s) => s.screenSharing);
   const { toggleMute, toggleScreenShare, leaveVoice, screenStream, remoteStreams } =
     useVoiceSession();
+  const peerVolumes = useSettings((s) => s.peerVolumes);
+  const setPeerVolume = useSettings((s) => s.setPeerVolume);
 
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [volumeUserId, setVolumeUserId] = useState<string | null>(null);
 
   const handleLeave = () => {
     leaveVoice();
@@ -65,11 +102,26 @@ export default function VoiceRoom() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFocusedId(null);
+      if (e.key === "Escape") {
+        setFocusedId(null);
+        setVolumeUserId(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (!volumeUserId) return;
+    const onPointerDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".voice-volume-pop") && !target.closest(".voice-tile.volume-open")) {
+        setVolumeUserId(null);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [volumeUserId]);
 
   useEffect(() => {
     if (!focusedId || focusedId === "self") return;
@@ -96,31 +148,80 @@ export default function VoiceRoom() {
 
   const renderTile = (
     id: string,
+    userId: string,
     username: string,
     avatarColor: string,
     isMuted: boolean,
     isSharing: boolean,
     stream: MediaStream | null,
-    isSelf = false
+    isSelf = false,
+    videoKey?: string | null
   ) => {
     const showVideo = isSharing && stream && stream.getVideoTracks().length > 0;
     const isFocused = focusedId === id;
+    const volumeOpen = volumeUserId === userId;
+    const volume = peerVolumes[userId] ?? 100;
+
+    const handleClick = () => {
+      if (isSelf) return;
+      setVolumeUserId((prev) => (prev === userId ? null : userId));
+    };
 
     return (
       <div
         key={id}
-        className={`voice-tile ${!isMuted ? "speaking" : ""} ${showVideo ? "shareable" : ""} ${isFocused ? "focused-thumb" : ""}`}
-        onClick={() => toggleFocus(id, !!showVideo)}
-        title={showVideo ? "Ekranı büyüt" : undefined}
+        className={`voice-tile ${!isMuted ? "speaking" : ""} ${showVideo ? "shareable" : ""} ${isFocused ? "focused-thumb" : ""} ${volumeOpen ? "volume-open" : ""} ${!isSelf ? "clickable" : ""}`}
+        onClick={handleClick}
+        title={isSelf ? undefined : "Ses seviyesi ayarla"}
       >
         {showVideo && stream ? (
-          <StreamVideo stream={stream} />
+          <StreamVideo key={videoKey ?? id} stream={stream} />
         ) : (
           <Avatar name={username} color={avatarColor} size={72} />
         )}
+
+        {volumeOpen && !isSelf && (
+          <div className="voice-volume-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="voice-volume-head">
+              <VolumeIcon size={16} />
+              <span>{username}</span>
+            </div>
+            <input
+              type="range"
+              className="voice-volume-slider"
+              min={0}
+              max={100}
+              value={volume}
+              onChange={(e) => setPeerVolume(userId, Number(e.target.value))}
+            />
+            <div className="voice-volume-meta">
+              <span>{volume}%</span>
+              {volume === 0 && <span className="voice-volume-muted">Sessiz</span>}
+            </div>
+            {showVideo && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm voice-volume-expand"
+                onClick={() => {
+                  toggleFocus(id, true);
+                  setVolumeUserId(null);
+                }}
+              >
+                Ekranı büyüt
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="vt-name">
           {username}
           {isSelf && " (sen)"}
+          {!isSelf && volume !== 100 && (
+            <span className="vt-volume" title={`Ses: ${volume}%`}>
+              <VolumeIcon size={12} />
+              {volume}%
+            </span>
+          )}
           {isMuted && (
             <span className="vt-muted">
               <MicOffIcon size={14} />
@@ -139,9 +240,25 @@ export default function VoiceRoom() {
   return (
     <div className="main">
       <header className="main-header">
+        {showMenuButton && (
+          <button type="button" className="hbtn mobile-menu-btn" aria-label="Menü" onClick={onMenuClick}>
+            <MenuIcon size={22} />
+          </button>
+        )}
         <VolumeIcon size={18} className="ch-icon" style={{ color: "var(--green)" }} />
         <span>{connectedChannelName}</span>
         <span className="sub">Sesli kanal · {others.length + 1} kişi</span>
+        <span className="spacer" />
+        {showMembersToggle && (
+          <button
+            type="button"
+            className={`hbtn ${membersVisible ? "active" : ""}`}
+            title="Üye listesi"
+            onClick={onToggleMembers}
+          >
+            <UsersIcon size={20} />
+          </button>
+        )}
       </header>
 
       <div className={`voice-stage ${focusedId ? "has-focus" : ""}`}>
@@ -159,7 +276,11 @@ export default function VoiceRoom() {
 
         {focusedRemote && (
           <div className="voice-focus-panel">
-            <StreamVideo stream={focusedRemote.stream} className="voice-focus-video" />
+            <StreamVideo
+              key={focusedRemote.videoTrackId ?? focusedRemote.socketId}
+              stream={focusedRemote.stream}
+              className="voice-focus-video"
+            />
             <div className="voice-focus-bar">
               <span>{focusedRemote.username} — ekran paylaşımı</span>
               <button type="button" className="btn btn-ghost voice-focus-close" onClick={() => setFocusedId(null)}>
@@ -171,29 +292,30 @@ export default function VoiceRoom() {
 
         <div className={`voice-grid ${focusedId ? "compact" : ""}`}>
           {user &&
-            renderTile("self", user.username, user.avatarColor, muted, screenSharing, screenStream, true)}
+            renderTile("self", user.id, user.username, user.avatarColor, muted, screenSharing, screenStream, true)}
 
           {remoteStreams.map((r) => {
             const p = others.find((x) => x.socketId === r.socketId);
             const showVideo = p?.screenSharing && r.stream.getVideoTracks().length > 0;
             return renderTile(
               r.socketId,
+              r.userId,
               r.username,
               r.avatarColor,
               !!p?.muted,
               !!p?.screenSharing,
-              showVideo ? r.stream : null
+              showVideo ? r.stream : null,
+              false,
+              r.videoTrackId
             );
           })}
 
           {others
             .filter((p) => !remoteStreams.some((r) => r.socketId === p.socketId))
-            .map((p) => renderTile(p.socketId, p.username, p.avatarColor, p.muted, p.screenSharing, null))}
+            .map((p) =>
+              renderTile(p.socketId, p.userId, p.username, p.avatarColor, p.muted, p.screenSharing, null)
+            )}
         </div>
-
-        {remoteStreams.map((r) => (
-          <RemoteAudio key={r.socketId} stream={r.stream} />
-        ))}
 
         <div className="voice-controls">
           <button

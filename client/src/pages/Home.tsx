@@ -23,12 +23,15 @@ import ServerBar from "../components/ServerBar";
 import VoiceBar from "../components/VoiceBar";
 
 import VoiceRoom from "../components/VoiceRoom";
+import { MenuIcon } from "../components/Icons";
 
 import { useVoice } from "../store/voice";
 
 import type { DirectMessage, Member } from "../types";
 import { getSocket } from "../lib/socket";
 import "./app.css";
+import "./mobile.css";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 
 
@@ -42,6 +45,8 @@ function HomeContent() {
 
   const [showMembers, setShowMembers] = useState(true);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const [dmFriend, setDmFriend] = useState<{ id: string; username: string } | null>(null);
 
@@ -93,6 +98,31 @@ function HomeContent() {
     };
   }, [user, activeDmUserId, addUnreadDm]);
 
+  useEffect(() => {
+    if (!isMobile) return;
+    setShowMembers(false);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const hasMain =
+      (view.kind === "home" && !!activeDmUserId) ||
+      (view.kind === "server" && !!activeChannel);
+    if (hasMain) setMobileSidebarOpen(false);
+  }, [isMobile, view.kind, activeDmUserId, activeChannel?.id]);
+
+  useEffect(() => {
+    if (!isMobile || view.kind !== "server") return;
+    if (activeServer && !activeChannel) setMobileSidebarOpen(true);
+  }, [isMobile, view.kind, activeServer?.id, activeChannel?.id]);
+
+  const openMobileSidebar = () => setMobileSidebarOpen(true);
+  const closeMobileSidebar = () => setMobileSidebarOpen(false);
+  const closeMembers = () => {
+    setShowMembers(false);
+    setSelectedMember(null);
+  };
+
 
 
   const inVoiceView =
@@ -105,6 +135,12 @@ function HomeContent() {
 
 
 
+  const mobileMenuBtn = isMobile ? (
+    <button type="button" className="hbtn mobile-menu-btn" aria-label="Menü" onClick={openMobileSidebar}>
+      <MenuIcon size={22} />
+    </button>
+  ) : null;
+
   const renderMain = () => {
 
     if (view.kind === "home") {
@@ -114,22 +150,19 @@ function HomeContent() {
         return (
 
           <ChatView
-
             mode="dm"
-
             dmUserId={dmFriend.id}
-
             title={dmFriend.username}
-
             subtitle="Özel mesaj"
-
+            showMenuButton={isMobile}
+            onMenuClick={openMobileSidebar}
           />
 
         );
 
       }
 
-      return <FriendsPanel />;
+      return <FriendsPanel showMenuButton={isMobile} onMenuClick={openMobileSidebar} />;
 
     }
 
@@ -138,19 +171,16 @@ function HomeContent() {
     if (!activeServer || !activeChannel) {
 
       return (
-
         <div className="main">
-
+          <header className="main-header">
+            {mobileMenuBtn}
+            <span>{activeServer?.name ?? "Sunucu"}</span>
+          </header>
           <div className="chat-empty">
-
             <div className="big">Bir kanal seç</div>
-
-            <p>Sol taraftan bir metin veya sesli kanala tıkla.</p>
-
+            <p>Sol menüden bir metin veya sesli kanala tıkla.</p>
           </div>
-
         </div>
-
       );
 
     }
@@ -158,9 +188,15 @@ function HomeContent() {
 
 
     if (inVoiceView) {
-
-      return <VoiceRoom />;
-
+      return (
+        <VoiceRoom
+          showMenuButton={isMobile}
+          onMenuClick={openMobileSidebar}
+          showMembersToggle={isMobile}
+          membersVisible={showMembers}
+          onToggleMembers={() => setShowMembers((v) => !v)}
+        />
+      );
     }
 
 
@@ -179,6 +215,8 @@ function HomeContent() {
           onToggleMembers={() => setShowMembers((v) => !v)}
           members={activeServer.members}
           roles={activeServer.roles ?? []}
+          showMenuButton={isMobile}
+          onMenuClick={openMobileSidebar}
         />
 
       );
@@ -188,19 +226,16 @@ function HomeContent() {
 
 
     return (
-
       <div className="main">
-
+        <header className="main-header">
+          {mobileMenuBtn}
+          <span>{activeServer?.name ?? "Sunucu"}</span>
+        </header>
         <div className="chat-empty">
-
           <div className="big">Bir kanal seç</div>
-
           <p>Metin kanallarından birine geçebilirsin — sesli bağlantın korunur.</p>
-
         </div>
-
       </div>
-
     );
 
   };
@@ -212,6 +247,15 @@ function HomeContent() {
     activeServer &&
     showMembers &&
     (activeChannel?.type === "TEXT" || inVoiceView);
+
+  const appClass = [
+    "app",
+    isMobile ? "mobile" : "",
+    mobileSidebarOpen ? "sidebar-open" : "",
+    isMobile && showMembersPanel ? "members-open" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
 
 
@@ -227,33 +271,46 @@ function HomeContent() {
 
   return (
 
-    <div className="app">
+    <div className={appClass}>
 
       <ServerBar />
 
-      {view.kind === "home" ? <DmSidebar /> : <ChannelSidebar />}
+      <div className="app-body">
+        {isMobile && mobileSidebarOpen && (
+          <div className="mobile-backdrop" onClick={closeMobileSidebar} aria-hidden />
+        )}
+        {isMobile && showMembersPanel && (
+          <div className="mobile-backdrop" onClick={closeMembers} aria-hidden />
+        )}
 
-      <div className="main-area">
+        {view.kind === "home" ? (
+          <DmSidebar onNavigate={closeMobileSidebar} />
+        ) : (
+          <ChannelSidebar onNavigate={closeMobileSidebar} />
+        )}
 
-        <div className="main-area-content">
+        <div className="main-area">
 
-          {renderMain()}
+          <div className="main-area-content">
 
-          {showMembersPanel && !selectedMember && (
-            <MemberList onSelectMember={setSelectedMember} />
-          )}
-          {showMembersPanel && selectedMember && activeServer && (
-            <MemberDetailPanel
-              userId={selectedMember.id}
-              serverId={activeServer.id}
-              onClose={() => setSelectedMember(null)}
-            />
-          )}
+            {renderMain()}
+
+            {showMembersPanel && !selectedMember && (
+              <MemberList onSelectMember={setSelectedMember} />
+            )}
+            {showMembersPanel && selectedMember && activeServer && (
+              <MemberDetailPanel
+                userId={selectedMember.id}
+                serverId={activeServer.id}
+                onClose={closeMembers}
+              />
+            )}
+
+          </div>
+
+          <VoiceBar />
 
         </div>
-
-        <VoiceBar />
-
       </div>
 
     </div>

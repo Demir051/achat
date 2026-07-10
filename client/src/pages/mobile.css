@@ -1,0 +1,303 @@
+/* Mobil uyum — ≤768px */
+
+@media (max-width: 768px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .app.mobile {
+    flex-direction: column;
+    height: 100%;
+    height: 100dvh;
+  }
+
+  .app.mobile .app-body {
+    order: 1;
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Sunucu çubuğu — altta yatay */
+  .app.mobile .server-bar {
+    order: 2;
+    width: 100%;
+    height: auto;
+    min-height: 58px;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+    gap: 8px;
+    border-right: none;
+    border-top: 1px solid var(--border-soft);
+    flex-shrink: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app.mobile .server-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    font-size: 16px;
+  }
+
+  .app.mobile .server-icon.active::before,
+  .app.mobile .server-icon .pill {
+    display: none;
+  }
+
+  .app.mobile .server-divider {
+    width: 2px;
+    height: 28px;
+  }
+
+  /* Kenar çubuğu — kaydırmalı panel */
+  .app.mobile .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+    width: min(288px, 88vw);
+    z-index: 300;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);
+  }
+
+  .app.mobile.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .app.mobile .main-area {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .app.mobile .main-area-content {
+    position: relative;
+  }
+
+  /* Üye paneli — sağdan */
+  .app.mobile .member-list,
+  .app.mobile .member-detail {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+    width: min(288px, 88vw);
+    z-index: 300;
+    transform: translateX(105%);
+    transition: transform 0.22s ease;
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.45);
+  }
+
+  .app.mobile.members-open .member-list,
+  .app.mobile.members-open .member-detail {
+    transform: translateX(0);
+  }
+
+  .mobile-backdrop {
+    position: fixed;
+    inset: 0;
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 250;
+    animation: fadeIn 0.2s ease;
+  }
+
+  /* Başlıklar */
+  .app.mobile .main-header {
+    height: 48px;
+    padding: 0 12px;
+    gap: 8px;
+    font-size: 14px;
+  }
+
+  .app.mobile .main-header .sub {
+    display: none;
+  }
+
+  .app.mobile .main-header.dm-header .sub {
+    display: inline;
+    font-size: 11px;
+  }
+
+  .app.mobile .main-header.dm-header .dm-title {
+    font-size: 17px;
+  }
+
+  .app.mobile .mobile-menu-btn {
+    margin-right: 2px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  /* Sohbet */
+  .app.mobile .messages {
+    padding: 12px 10px 6px;
+  }
+
+  .app.mobile .msg {
+    gap: 10px;
+    padding: 6px 4px;
+  }
+
+  .app.mobile .msg .avatar-slot {
+    width: 32px;
+  }
+
+  .app.mobile .msg.grouped .avatar-slot {
+    width: 32px;
+  }
+
+  .app.mobile .composer {
+    padding: 0 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app.mobile .composer-inner input {
+    font-size: 16px; /* iOS zoom önleme */
+  }
+
+  .app.mobile .composer-send,
+  .app.mobile .composer-emoji {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Arkadaşlar */
+  .app.mobile .friends-page {
+    padding: 16px 14px;
+  }
+
+  .app.mobile .friends-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .app.mobile .friends-tab {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .app.mobile .add-friend-row {
+    flex-direction: column;
+    max-width: none;
+  }
+
+  /* Sesli oda */
+  .app.mobile .voice-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .app.mobile .voice-grid.compact {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    max-height: 120px;
+  }
+
+  .app.mobile .voice-controls {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    gap: 12px;
+  }
+
+  .app.mobile .vc-btn {
+    width: 48px;
+    height: 48px;
+  }
+
+  .app.mobile .voice-focus-panel {
+    padding: 10px 10px 0;
+  }
+
+  .app.mobile .voice-bar {
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app.mobile .voice-bar.visible {
+    flex-wrap: wrap;
+  }
+
+  /* Modal — alttan sheet */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92dvh;
+    overflow-y: auto;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .server-settings-modal {
+    max-height: 95dvh;
+  }
+
+  .ss-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ss-add-role {
+    flex-wrap: wrap;
+  }
+
+  /* Dokunmatik hedefler */
+  .app.mobile .channel-item,
+  .app.mobile .dm-nav,
+  .app.mobile .hbtn,
+  .app.mobile .user-panel .icon-btn {
+    min-height: 44px;
+  }
+
+  .app.mobile .sidebar-header .invite-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .app.mobile .chat-empty .big {
+    font-size: 18px;
+  }
+
+  .app.mobile .chat-empty p {
+    font-size: 14px;
+    padding: 0 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .toast-container {
+    left: 12px;
+    right: 12px;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .toast {
+    max-width: none;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button,
+  .channel-item,
+  .server-icon,
+  .friend-card {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
