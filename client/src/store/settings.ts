@@ -6,12 +6,24 @@ interface SettingsState {
   micDeviceId: string;
   speakerDeviceId: string;
   peerVolumes: Record<string, number>;
+  peerScreenVolumes: Record<string, number>;
   setTheme: (theme: string) => void;
   setMicDevice: (id: string) => void;
   setSpeakerDevice: (id: string) => void;
   setPeerVolume: (userId: string, volume: number) => void;
+  setPeerScreenVolume: (userId: string, volume: number) => void;
   getPeerVolume: (userId: string) => number;
+  getPeerScreenVolume: (userId: string) => number;
   initFromUser: (user: { theme?: string; micDeviceId?: string; speakerDeviceId?: string }) => void;
+}
+
+function loadPeerScreenVolumes(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem("achat_peer_screen_volumes");
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
 }
 
 function loadPeerVolumes(): Record<string, number> {
@@ -32,6 +44,7 @@ export const useSettings = create<SettingsState>((set, get) => ({
   micDeviceId: localStorage.getItem("achat_mic") ?? "",
   speakerDeviceId: localStorage.getItem("achat_speaker") ?? "",
   peerVolumes: loadPeerVolumes(),
+  peerScreenVolumes: loadPeerScreenVolumes(),
 
   setTheme: (theme) => {
     localStorage.setItem("achat_theme", theme);
@@ -58,7 +71,18 @@ export const useSettings = create<SettingsState>((set, get) => ({
     });
   },
 
+  setPeerScreenVolume: (userId, volume) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(volume)));
+    set((s) => {
+      const peerScreenVolumes = { ...s.peerScreenVolumes, [userId]: clamped };
+      localStorage.setItem("achat_peer_screen_volumes", JSON.stringify(peerScreenVolumes));
+      return { peerScreenVolumes };
+    });
+  },
+
   getPeerVolume: (userId) => get().peerVolumes[userId] ?? 100,
+
+  getPeerScreenVolume: (userId) => get().peerScreenVolumes[userId] ?? 100,
 
   initFromUser: (user) => {
     if (user.theme) {

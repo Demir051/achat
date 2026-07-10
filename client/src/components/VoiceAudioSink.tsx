@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { unlockAudioPlayback } from "../lib/audioUnlock";
 import { useVoiceSession } from "../context/VoiceContext";
+import { useAuth } from "../store/auth";
 import { useSettings } from "../store/settings";
 import { useVoice } from "../store/voice";
 
@@ -11,7 +12,6 @@ function RemoteAudioPlayer({
 }: {
   stream: MediaStream;
   trackKey: string;
-  userId: string;
   volume: number;
 }) {
   const ref = useRef<HTMLAudioElement>(null);
@@ -32,7 +32,7 @@ function RemoteAudioPlayer({
         el.srcObject = null;
         return;
       }
-      el.srcObject = stream;
+      el.srcObject = new MediaStream(tracks);
       el.volume = Math.max(0, Math.min(1, volume / 100));
       try {
         await el.play();
@@ -80,22 +80,35 @@ function RemoteAudioPlayer({
 /** Sesli kanaldayken uzak sesleri her zaman çalar (metin kanalında gezinirken de). */
 export default function VoiceAudioSink() {
   const connectedChannelId = useVoice((s) => s.connectedChannelId);
+  const myUserId = useAuth((s) => s.user?.id);
   const { remoteStreams } = useVoiceSession();
   const peerVolumes = useSettings((s) => s.peerVolumes);
+  const peerScreenVolumes = useSettings((s) => s.peerScreenVolumes);
 
   if (!connectedChannelId) return null;
 
   return (
     <>
-      {remoteStreams.map((r) => (
-        <RemoteAudioPlayer
-          key={r.socketId}
-          userId={r.userId}
-          trackKey={r.audioTrackKey}
-          stream={r.stream}
-          volume={peerVolumes[r.userId] ?? 100}
-        />
-      ))}
+      {remoteStreams
+        .filter((r) => r.userId !== myUserId)
+        .map((r) => (
+          <span key={r.socketId} hidden aria-hidden>
+            {r.micStream.getAudioTracks().length > 0 && (
+              <RemoteAudioPlayer
+                stream={r.micStream}
+                trackKey={r.audioTrackKey}
+                volume={peerVolumes[r.userId] ?? 100}
+              />
+            )}
+            {r.screenAudioStream && r.screenAudioStream.getAudioTracks().length > 0 && (
+              <RemoteAudioPlayer
+                stream={r.screenAudioStream}
+                trackKey={r.screenAudioTrackKey}
+                volume={peerScreenVolumes[r.userId] ?? 100}
+              />
+            )}
+          </span>
+        ))}
     </>
   );
 }

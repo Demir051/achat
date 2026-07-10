@@ -101,7 +101,9 @@ export default function VoiceRoom({
   const { toggleMute, toggleScreenShare, leaveVoice, screenStream, remoteStreams } =
     useVoiceSession();
   const peerVolumes = useSettings((s) => s.peerVolumes);
+  const peerScreenVolumes = useSettings((s) => s.peerScreenVolumes);
   const setPeerVolume = useSettings((s) => s.setPeerVolume);
+  const setPeerScreenVolume = useSettings((s) => s.setPeerScreenVolume);
 
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [volumeUserId, setVolumeUserId] = useState<string | null>(null);
@@ -173,6 +175,8 @@ export default function VoiceRoom({
     const isFocused = focusedId === id;
     const volumeOpen = volumeUserId === userId;
     const volume = peerVolumes[userId] ?? 100;
+    const screenVolume = peerScreenVolumes[userId] ?? 100;
+    const hasScreenAudio = isSharing;
 
     const handleClick = () => {
       if (isSelf) return;
@@ -198,6 +202,11 @@ export default function VoiceRoom({
               <VolumeIcon size={16} />
               <span>{username}</span>
             </div>
+
+            <label className="voice-volume-label">
+              <MicIcon size={14} />
+              Mikrofon
+            </label>
             <input
               type="range"
               className="voice-volume-slider"
@@ -210,6 +219,28 @@ export default function VoiceRoom({
               <span>{volume}%</span>
               {volume === 0 && <span className="voice-volume-muted">Sessiz</span>}
             </div>
+
+            {hasScreenAudio && (
+              <>
+                <label className="voice-volume-label">
+                  <ScreenIcon size={14} />
+                  Ekran sesi
+                </label>
+                <input
+                  type="range"
+                  className="voice-volume-slider"
+                  min={0}
+                  max={100}
+                  value={screenVolume}
+                  onChange={(e) => setPeerScreenVolume(userId, Number(e.target.value))}
+                />
+                <div className="voice-volume-meta">
+                  <span>{screenVolume}%</span>
+                  {screenVolume === 0 && <span className="voice-volume-muted">Sessiz</span>}
+                </div>
+              </>
+            )}
+
             {showVideo && (
               <button
                 type="button"
@@ -229,9 +260,15 @@ export default function VoiceRoom({
           {username}
           {isSelf && " (sen)"}
           {!isSelf && volume !== 100 && (
-            <span className="vt-volume" title={`Ses: ${volume}%`}>
+            <span className="vt-volume" title={`Mikrofon: ${volume}%`}>
               <VolumeIcon size={12} />
               {volume}%
+            </span>
+          )}
+          {!isSelf && hasScreenAudio && screenVolume !== 100 && (
+            <span className="vt-volume vt-screen-volume" title={`Ekran sesi: ${screenVolume}%`}>
+              <ScreenIcon size={12} />
+              {screenVolume}%
             </span>
           )}
           {isMuted && (

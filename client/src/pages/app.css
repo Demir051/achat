@@ -743,6 +743,16 @@ html[data-theme-category="series"] .msg.mentioned:hover {
   font-weight: 600;
   color: var(--text);
 }
+.voice-volume-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 .voice-volume-slider {
   width: 100%;
   accent-color: var(--accent);
@@ -771,6 +781,9 @@ html[data-theme-category="series"] .msg.mentioned:hover {
   font-size: 11px;
   color: var(--accent);
   opacity: 0.9;
+}
+.vt-screen-volume {
+  color: var(--green);
 }
 .voice-tile.shareable:hover {
   border-color: var(--accent);

@@ -26,9 +26,12 @@ interface RemoteStream {
   username: string;
   avatarColor: string;
   stream: MediaStream;
+  micStream: MediaStream;
+  screenAudioStream: MediaStream | null;
   screenSharing: boolean;
   videoTrackId: string | null;
   audioTrackKey: string;
+  screenAudioTrackKey: string;
 }
 
 interface PeerMeta {
@@ -48,12 +51,35 @@ function audioTrackKey(stream: MediaStream) {
 function pickScreenVideoTrack(stream: MediaStream): MediaStreamTrack | null {
   const tracks = stream.getVideoTracks().filter((t) => t.readyState !== "ended");
   if (!tracks.length) return null;
-  // Ekran paylaşımı track'i genelde displaySurface içerir
   const screen = tracks.find((t) => {
     const s = t.getSettings();
     return Boolean(s.displaySurface);
   });
   return screen ?? tracks[tracks.length - 1];
+}
+
+function isScreenAudioTrack(track: MediaStreamTrack) {
+  const s = track.getSettings();
+  return Boolean(s.displaySurface);
+}
+
+/** addTrack sırası: mic → screenVideo → screenAudio */
+function splitRemoteAudio(pc: RTCPeerConnection) {
+  const audioTracks = pc
+    .getReceivers()
+    .map((r) => r.track)
+    .filter((t): t is MediaStreamTrack => !!t && t.kind === "audio" && t.readyState !== "ended");
+
+  const screen = audioTracks.filter(isScreenAudioTrack);
+  const mic = audioTracks.filter((t) => !isScreenAudioTrack(t));
+
+  if (screen.length === 0 && audioTracks.length >= 2) {
+    return { mic: [audioTracks[0]], screen: audioTracks.slice(1) };
+  }
+  if (mic.length === 0 && audioTracks.length === 1 && screen.length === 0) {
+    return { mic: audioTracks, screen: [] as MediaStreamTrack[] };
+  }
+  return { mic, screen };
 }
 
 export function useWebRTC(channelId: string | null, participants: VoiceParticipant[]) {
@@ -107,6 +133,9 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
       if (!hasMedia) return;
 
       const videoTrack = pickScreenVideoTrack(stream);
+      const { mic, screen } = splitRemoteAudio(pc);
+      const micStream = new MediaStream(mic);
+      const screenAudioStream = screen.length ? new MediaStream(screen) : null;
 
       list.push({
         socketId,
@@ -114,9 +143,12 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
         username: p.username,
         avatarColor: p.avatarColor,
         stream,
+        micStream,
+        screenAudioStream,
         screenSharing: p.screenSharing,
         videoTrackId: videoTrack?.id ?? null,
-        audioTrackKey: audioTrackKey(stream),
+        audioTrackKey: audioTrackKey(micStream),
+        screenAudioTrackKey: screenAudioStream ? audioTrackKey(screenAudioStream) : "",
       });
     });
     setRemoteStreams(list);
@@ -465,7 +497,12 @@ export function useWebRTC(channelId: string | null, participants: VoiceParticipa
           height: { ideal: 1080 },
           frameRate: { ideal: 24, max: 30 },
         },
-        audio: true,
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          suppressLocalAudioPlayback: true,
+        } as MediaTrackConstraints,
         preferCurrentTab: false,
       } as DisplayMediaStreamOptions);
 
